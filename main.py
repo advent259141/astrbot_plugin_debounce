@@ -589,7 +589,8 @@ class DebouncePlugin(Star):
                 sender=original_event.message_obj.sender,
                 message=new_message_components,
                 message_str=message_text,
-                group_id=original_event.get_group_id() or ""
+                group_id=original_event.get_group_id() or "",
+                message_id=original_event.message_obj.message_id,  # 伪造消息时保留真实ID
             )
             
             # 标记这个消息需要跳过防抖
