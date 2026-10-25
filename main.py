@@ -703,12 +703,23 @@ class DebouncePlugin(Star):
             self.skip_debounce_msg_ids.add(new_message.message_id)
             replay_id = new_message.message_id
 
-            # 伪造事件并提交
-            await StarTools.create_event(
-                abm=new_message,
-                platform=original_event.get_platform_name(),
-                is_wake=True,
-            )
+            # 伪造事件并提交。
+            # 不能直接用 StarTools.create_event：它只设置 is_wake，不设置
+            # is_at_or_wake_command，而 AstrBot 的正常回复路径要求后者为真
+            # （process_stage/stage.py），否则重投的消息只能走「群聊主动回复」
+            # 的概率路径，大概率被静默丢弃。
+            platform_name = original_event.get_platform_name()
+            platforms = self.context.platform_manager.get_insts()
+            adapter = next((p for p in platforms if p.meta().id == platform_name), None)
+            if adapter is None:
+                adapter = next((p for p in platforms if p.meta().name == platform_name), None)
+            if adapter is None:
+                raise ValueError(f"Platform not found: {platform_name}")
+
+            event = adapter.create_event(new_message)
+            event.is_wake = True
+            event.is_at_or_wake_command = True
+            adapter.commit_event(event)
 
             logger.debug(f"[Debounce] 已伪造事件发送: {message_text[:50]}")
             return True
