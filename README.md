@@ -125,7 +125,6 @@ TypeSafe 官方及原生中转使用[原生实验性图片接口](https://docs.t
 | `timeout_seconds` | 整数 | `10` | 超时自动发送时间（秒），设为 0 禁用 |
 | `enabled` | 布尔 | `true` | 是否启用插件 |
 | `cancel_on_new_message` | 布尔 | `true` | LLM 回复前收到新消息时取消回复 |
-| `debug_mode` | 布尔 | `false` | 调试模式，输出详细日志 |
 
 ### 配置示例
 
@@ -135,8 +134,7 @@ TypeSafe 官方及原生中转使用[原生实验性图片接口](https://docs.t
   "send_threshold": 0.6,
   "timeout_seconds": 30,
   "enabled": true,
-  "cancel_on_new_message": true,
-  "debug_mode": false
+  "cancel_on_new_message": true
 }
 ```
 
@@ -227,12 +225,12 @@ LLM:  虽然今天很累，但还是要注意休息哦！
 
 ## 🐛 调试
 
-开启调试模式后，日志会输出详细信息：
+插件通过 AstrBot 的 DEBUG 级别日志输出判断过程。查看详细日志时，将 AstrBot 的日志级别设为 `DEBUG`；插件没有独立的调试模式配置项。
 
 ```
-[防抖] 文本: '如果明天不下雨' | 完整概率: 0.2341 | 判定: 等待
-[防抖] 文本: '如果明天不下雨 我们去爬山' | 完整概率: 0.8762 | 判定: 发送
-[防抖] 完整发送: 如果明天不下雨 我们去爬山
+完整概率: 0.23 | 判定: 等待
+完整概率: 0.88 | 判定: 发送
+[Debounce] 合并消息发送: 如果明天不下雨 我们去爬山
 ```
 
 ---
