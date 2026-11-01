@@ -58,6 +58,11 @@ def load_plugin():
     with patch.dict(sys.modules, modules):
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
+        loaded = {
+            name: value for name, value in sys.modules.items()
+            if name == spec.name or name.startswith(spec.name + ".")
+        }
+    sys.modules.update(loaded)
     return module
 
 

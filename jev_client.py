@@ -53,6 +53,29 @@ def number(value, minimum: float, maximum: float) -> float:
     return result
 
 
+async def prepare_images(images, max_images):
+    unique = {}
+    for picture in images:
+        source = image_source(picture)
+        unique.setdefault(source or str(id(picture)), picture)
+    selected = list(unique.values())[-max_images :]
+
+    async def asset(picture):
+        if isinstance(picture, str):
+            from astrbot.api.message_components import Image
+
+            picture = Image(file=picture)
+        encoded = await picture.convert_to_base64()
+        return {
+            "type": "image",
+            "format": "jpg",
+            "data_base64": await asyncio.to_thread(_encode_image, encoded),
+        }
+
+    prepared = await asyncio.gather(*(asset(picture) for picture in selected))
+    return prepared, len(unique) - len(selected)
+
+
 class JevClient:
     def __init__(self, config):
         self.api_key = (
@@ -98,25 +121,7 @@ class JevClient:
         payload = {"model": self.model, "state": state, "questions": questions}
         headers = {"Authorization": f"Bearer {self.api_key}"}
         if images and self.enable_images:
-            unique = {}
-            for picture in images:
-                source = image_source(picture)
-                unique.setdefault(source or str(id(picture)), picture)
-            selected = list(unique.values())[-self.max_images :]
-
-            async def asset(picture):
-                if isinstance(picture, str):
-                    from astrbot.api.message_components import Image
-
-                    picture = Image(file=picture)
-                encoded = await picture.convert_to_base64()
-                return {
-                    "type": "image",
-                    "format": "jpg",
-                    "data_base64": await asyncio.to_thread(_encode_image, encoded),
-                }
-
-            prepared = await asyncio.gather(*(asset(picture) for picture in selected))
+            prepared, omitted = await prepare_images(images, self.max_images)
             multimodal_state = (
                 dict(state) if isinstance(state, dict) else {"message": state}
             )
@@ -136,8 +141,8 @@ class JevClient:
                 multimodal_state["images"] = list(assets)
                 payload["assets"] = assets
                 headers["TypeSafe-Danger-Zone-Images"] = "true"
-            if len(unique) > len(selected):
-                multimodal_state["omitted_images"] = len(unique) - len(selected)
+            if omitted:
+                multimodal_state["omitted_images"] = omitted
             payload["state"] = multimodal_state
 
         try:
@@ -160,13 +165,17 @@ class JevClient:
         except aiohttp.ClientError as exc:
             raise ValueError("JEV connection failed") from exc
 
-        if not isinstance(data, dict) or not isinstance(data.get("answers"), dict):
-            raise ValueError("JEV response is missing answers")
-        answers = data["answers"]
-        for name, question in questions.items():
-            if (
-                not isinstance(answers.get(name), dict)
-                or answers[name].get("type") != question["type"]
-            ):
-                raise ValueError("JEV response has a missing or mismatched answer")
-        return answers
+        return validate_answers(data, questions)
+
+
+def validate_answers(data, questions):
+    if not isinstance(data, dict) or not isinstance(data.get("answers"), dict):
+        raise ValueError("JEV response is missing answers")
+    answers = data["answers"]
+    for name, question in questions.items():
+        if (
+            not isinstance(answers.get(name), dict)
+            or answers[name].get("type") != question["type"]
+        ):
+            raise ValueError("JEV response has a missing or mismatched answer")
+    return answers
