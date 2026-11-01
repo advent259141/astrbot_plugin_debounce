@@ -264,6 +264,105 @@ class JevDebounceTests(unittest.IsolatedAsyncioTestCase):
         await self.submit("hello", "1")
         self.plugin.classifier.predict.assert_not_awaited()
 
+    async def test_disabled_cancellation_preserves_reply_and_next_message(self):
+        self.plugin.config["cancel_on_new_message"] = False
+        self.plugin.classifier.predict = AsyncMock(return_value=(0.99, 0.99))
+        first, _ = await self.submit("第一个问题", "1")
+        second = Event("第二个问题", "2")
+        await self.plugin.on_waiting_llm_request(second)
+
+        response = types.SimpleNamespace(completion_text="第一个回答")
+        await self.plugin.on_llm_response(first, response)
+        self.assertEqual(response.completion_text, "第一个回答")
+        request = types.SimpleNamespace(prompt=second.message_str, image_urls=[])
+        await self.plugin.on_llm_request(second, request)
+        self.assertFalse(second.stopped)
+        self.assertEqual(request.prompt, "第二个问题")
+        self.assertEqual(self.plugin.buffers["test"].messages, ["第二个问题"])
+        self.assertFalse(self.plugin.discard_next_response)
+        self.assertFalse(self.plugin.should_cancel_msg_ids)
+
+    async def test_disabled_cancellation_preserves_messages_during_judgment(self):
+        self.plugin.config["cancel_on_new_message"] = False
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def slow_judgment(_text):
+            started.set()
+            await release.wait()
+            return 0.99, 0.99
+
+        self.plugin.classifier.predict = slow_judgment
+        first_task = asyncio.create_task(self.submit("第一个问题", "1"))
+        await started.wait()
+        queued = [Event("第二个问题", "2"), Event("第三个问题", "3")]
+        for event in queued:
+            await self.plugin.on_waiting_llm_request(event)
+        release.set()
+        first, _ = await first_task
+        self.assertFalse(first.stopped)
+        await self.plugin.on_llm_response(
+            first, types.SimpleNamespace(completion_text="第一个回答")
+        )
+
+        # AstrBot runs request/response hooks inside the session lock.
+        for event in queued:
+            request = types.SimpleNamespace(prompt=event.message_str, image_urls=[])
+            await self.plugin.on_llm_request(event, request)
+            self.assertFalse(event.stopped)
+            self.assertEqual(request.prompt, event.message_str)
+            self.assertEqual(self.plugin.buffers["test"].messages, [event.message_str])
+            response = types.SimpleNamespace(completion_text="回答")
+            await self.plugin.on_llm_response(event, response)
+            self.assertEqual(response.completion_text, "回答")
+        self.assertFalse(self.plugin.waiting_msg_ids)
+        self.assertFalse(self.plugin.should_cancel_msg_ids)
+
+    async def test_disabled_cancellation_still_merges_incomplete_fragments(self):
+        self.plugin.config["cancel_on_new_message"] = False
+        self.plugin.config["timeout_seconds"] = 10
+        self.plugin.classifier.predict = AsyncMock(
+            side_effect=[(0.1, 0.1), (0.99, 0.99)]
+        )
+        first, _ = await self.submit("如果明天", "1")
+        monitor = self.plugin.monitor_tasks["test"]
+        second, request = await self.submit("不下雨就去爬山", "2")
+        self.assertTrue(first.stopped)
+        self.assertFalse(second.stopped)
+        self.assertEqual(request.prompt, "如果明天 不下雨就去爬山")
+        await asyncio.gather(monitor, return_exceptions=True)
+        self.assertFalse(self.plugin.monitor_tasks)
+
+    async def test_default_cancellation_discards_old_reply_and_merges(self):
+        self.plugin.classifier.predict = AsyncMock(return_value=(0.99, 0.99))
+        picture = types.SimpleNamespace(type="Image", file="base64://first")
+        first, _ = await self.submit("第一个问题", "1", [picture])
+        second = Event("补充内容", "2")
+        await self.plugin.on_waiting_llm_request(second)
+        response = types.SimpleNamespace(completion_text="旧回答")
+        await self.plugin.on_llm_response(first, response)
+        self.assertEqual(response.completion_text, "")
+        request = types.SimpleNamespace(prompt=second.message_str, image_urls=[])
+        await self.plugin.on_llm_request(second, request)
+        self.assertFalse(second.stopped)
+        self.assertEqual(request.prompt, "第一个问题 补充内容")
+        self.assertEqual(request.image_urls, [picture.file])
+        self.assertEqual(self.plugin.buffers["test"].images, [picture])
+
+    async def test_default_cancellation_merges_messages_waiting_for_lock(self):
+        self.plugin.classifier.predict = AsyncMock(return_value=(0.99, 0.99))
+        first = Event("第一段", "1")
+        second = Event("第二段", "2")
+        await self.plugin.on_waiting_llm_request(first)
+        await self.plugin.on_waiting_llm_request(second)
+        first_request = types.SimpleNamespace(prompt=first.message_str, image_urls=[])
+        await self.plugin.on_llm_request(first, first_request)
+        self.assertTrue(first.stopped)
+        second_request = types.SimpleNamespace(prompt=second.message_str, image_urls=[])
+        await self.plugin.on_llm_request(second, second_request)
+        self.assertFalse(second.stopped)
+        self.assertEqual(second_request.prompt, "第一段 第二段")
+
     async def test_timeout_flushes_and_unload_cancels_monitors(self):
         self.plugin.config["timeout_seconds"] = 10
         self.plugin.classifier.predict = AsyncMock(return_value=(0.1, 0.1))

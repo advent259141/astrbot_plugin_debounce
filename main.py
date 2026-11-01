@@ -330,16 +330,16 @@ class DebouncePlugin(Star):
             logger.debug(f"[Debounce] 检测到伪造消息（跳过状态检查）: {session_id}")
             return
 
-        # 如果该session有消息正在等待锁，取消它（只处理最新的消息）
-        if session_id in self.waiting_msg_ids:
-            old_msg_id = self.waiting_msg_ids[session_id]
-            self.should_cancel_msg_ids.add(old_msg_id)
-            logger.debug(
-                f"[Debounce] 标记前一个等待中的消息应被取消: {session_id}, msg_id: {old_msg_id}"
-            )
-
-        # 记录当前消息正在等待锁
-        self.waiting_msg_ids[session_id] = msg_id
+        cancel_on_new_message = self.config.get("cancel_on_new_message", True)
+        if cancel_on_new_message:
+            # Only supersede queued requests when cancellation is enabled.
+            if session_id in self.waiting_msg_ids:
+                old_msg_id = self.waiting_msg_ids[session_id]
+                self.should_cancel_msg_ids.add(old_msg_id)
+                logger.debug(
+                    f"[Debounce] 标记前一个等待中的消息应被取消: {session_id}, msg_id: {old_msg_id}"
+                )
+            self.waiting_msg_ids[session_id] = msg_id
 
         # 取消之前的监控任务
         if session_id in self.monitor_tasks:
@@ -348,7 +348,7 @@ class DebouncePlugin(Star):
             logger.debug(f"[Debounce] 新消息到达，取消监控任务: {session_id}")
 
         # 如果之前的请求还在处理中，标记需要丢弃其响应
-        if session_id in self.pending_llm_sessions:
+        if cancel_on_new_message and session_id in self.pending_llm_sessions:
             self.discard_next_response.add(session_id)
             logger.debug(f"[Debounce] 新消息到达，标记旧LLM响应需要丢弃: {session_id}")
 
@@ -563,6 +563,8 @@ class DebouncePlugin(Star):
             logger.debug(f"[Debounce] 已丢弃过时的 LLM 回复: {session_id}")
             # 输出空文本
             resp.completion_text = ""
+            # Keep the discarded request available for the next merged prompt.
+            self.waiting_sessions.add(session_id)
         else:
             # 只有成功的响应才清空buffer
             if session_id in self.buffers:
