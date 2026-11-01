@@ -43,6 +43,8 @@
 - **灵活配置**：可调节判断阈值、超时时间等参数
 - **零感知**：静默工作，不打扰用户
 - **低开销**：使用 ONNX 推理，CPU 友好
+- **远程判断**：支持 TypeSafe JEV（结构化决策模型）和 Cloudflare Workers AI（云端模型服务）
+- **连接测试**：在插件可视化视图中点击按钮，验证已保存的远程模型配置
 
 ---
 
@@ -67,6 +69,46 @@ git clone https://github.com/yourusername/astrbot_plugin_debounce.git
 ---
 
 ## ⚙️ 配置说明
+
+### 使用 Cloudflare Workers AI（云端模型服务）
+
+将 `classifier_backend`（判断后端）设为 `cloudflare`，填写以下配置，保存并重载插件：
+
+| 配置项 | 中文用途 | 填写说明 |
+|--------|----------|----------|
+| `cloudflare_base_url` | Cloudflare 接口基地址 | `https://api.cloudflare.com/client/v4/accounts/你的账户ID/ai/run`，不需要追加模型名称 |
+| `cloudflare_api_key` | Cloudflare 接口密钥 | 使用具有该账户 Workers AI 调用权限的 API Token（接口令牌） |
+| `cloudflare_model` | Cloudflare 决策模型 | `@cf/cloudflare/clef-flash`（快速版，默认）、`@cf/cloudflare/clef`（标准版）或 `@cf/cloudflare/clef-omni`（多模态版），或选择“自定义” |
+| `cloudflare_custom_model` | Cloudflare 自定义决策模型 | 选择“自定义”后填写完整模型 ID；仅支持兼容 Clef 决策接口的模型，普通聊天模型不能直接使用 |
+| `cloudflare_timeout_seconds` | Cloudflare 请求超时秒数 | 单次远程判断的超时，与等待用户补充消息的 `timeout_seconds`（防抖等待秒数）独立 |
+| `cloudflare_enable_images` | 让图片参与消息完整性判断（可选） | 默认关闭。开启会把图片发给 Cloudflare，帮助判断消息是否说完；不控制最终回复模型能否看图，也不会删除原图 |
+| `cloudflare_max_images` | Cloudflare 单次判断图片上限 | 默认 4 张，范围 1–4；只限制判断请求，不删除交给回复模型的图片 |
+
+插件使用 [Cloudflare Clef 原生决策接口](https://developers.cloudflare.com/workers-ai/models/clef-flash/)，
+不能将 Cloudflare 地址填入 `jev_base_url`（JEV 接口基地址）。此后端不加载或下载本地 ONNX 模型。
+接口异常时，插件会放行已经合并的消息，避免阻塞正常回复。
+图片判断开启时，连续图文消息会结合缓存中的图片与文字判断；关闭后，纯图片直接交给回复模型，
+图文消息仅按文字判断。JEV 与 Cloudflare 的图片开关和数量上限分别配置。
+
+Cloudflare 免费计划的每日额度由账户共享；测试连接也会消耗少量额度。付费计划超额可能计费，
+具体以 [Cloudflare 官方价格说明](https://developers.cloudflare.com/workers-ai/platform/pricing/)和账户设置为准。
+密钥在配置页面遮罩显示，但仍会保存在服务器配置文件中，请勿将其放入截图、日志或公开反馈。
+
+### 测试远程模型连接
+
+1. 在插件配置中填写 Cloudflare 或 JEV 参数，保存并重载插件。
+2. 在 AstrBot WebUI（管理面板）的插件列表中点击「消息防抖」卡片进入详情，打开「连接测试」视图。
+3. 点击「刷新配置」，核对当前判断后端和模型，再点击「测试连接」。
+
+测试只调用一次当前已保存并加载的配置，发送固定短测试句，检查接口连接及完整性判断结果的格式，
+不读取聊天记录、不进入消息缓存、不触发聊天回复。执行时按钮会暂时禁用，完成后显示成功或失败及耗时。
+修改配置后需要先保存并重载，再刷新测试页；页面无法读取配置弹窗中未保存的输入。
+ONNX（本地判断模型）无需测试远程连接。
+
+按钮使用 AstrBot 官方插件可视化视图（Views），已确认 AstrBot v4.29.3 支持。
+旧版 AstrBot 若没有视图入口，仍可使用插件原有消息防抖功能；不能在普通配置弹窗中显示此按钮。
+若页面提示读取失败，请检查管理面板登录状态；认证、额度、网络或返回格式错误则按页面提示检查服务配置。
+连接成功只证明接口与结果格式可用，不保证所有中文消息的语义判断都准确。
 
 ### 使用 TypeSafe JEV
 

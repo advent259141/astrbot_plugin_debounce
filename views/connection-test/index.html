@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>消息防抖 · 连接测试</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>连接测试</h1>
+      <p class="subtitle">消息防抖 · 远程判断模型</p>
+      <aside>
+        请先在插件配置中保存设置。本页面只测试已保存并加载的配置，不能读取配置弹窗中尚未保存的内容。
+      </aside>
+      <section aria-labelledby="configuration-title">
+        <h2 id="configuration-title">当前配置</h2>
+        <dl>
+          <div><dt>判断后端</dt><dd id="backend">正在读取…</dd></div>
+          <div><dt>模型</dt><dd id="model">—</dd></div>
+        </dl>
+        <p id="configuration-note">正在连接 AstrBot 管理面板…</p>
+        <div class="actions">
+          <button id="test" type="button" disabled>测试连接</button>
+          <button id="refresh" class="secondary" type="button" disabled>刷新配置</button>
+        </div>
+      </section>
+      <section id="result" aria-labelledby="result-title" aria-live="polite" aria-atomic="true" hidden>
+        <h2 id="result-title">测试结果</h2>
+        <p id="result-message"></p>
+        <p id="result-detail" class="detail"></p>
+      </section>
+      <p class="footnote">每次点击只发送一次固定短测试句，不读取聊天记录，也不触发聊天回复。远程测试会消耗少量服务额度；测试成功不代表所有消息都能被准确判断。</p>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

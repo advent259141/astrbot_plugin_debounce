@@ -1,0 +1,14 @@
+{
+  "pages": {
+    "connection-test": {
+      "title": "连接测试",
+      "description": "测试消息防抖插件已保存的远程模型配置。"
+    }
+  },
+  "views": {
+    "connection-test": {
+      "title": "连接测试",
+      "description": "测试消息防抖插件已保存的远程模型配置。"
+    }
+  }
+}

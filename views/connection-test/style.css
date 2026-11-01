@@ -1,0 +1,56 @@
+:root {
+  color-scheme: light;
+  --background: #f6f7fb;
+  --surface: #fff;
+  --text: #202433;
+  --muted: #596174;
+  --border: #dce0ea;
+  --notice: #edf2ff;
+  --primary: #4058ba;
+  --success: #24724d;
+  --error: #b3323e;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #191b23;
+  --surface: #242733;
+  --text: #eceef5;
+  --muted: #b5bdcf;
+  --border: #414655;
+  --notice: #2c3451;
+  --primary: #a8b8ff;
+  --success: #80d6a6;
+  --error: #ff9ca6;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--text); font-family: system-ui, sans-serif; line-height: 1.65; }
+main { max-width: 760px; margin: 0 auto; padding: 32px 24px; }
+h1 { margin: 0; font-size: 1.65rem; }
+h2 { margin: 0 0 16px; font-size: 1.05rem; }
+p { margin: 12px 0; }
+.subtitle, .detail, .footnote, #configuration-note { color: var(--muted); }
+.subtitle { margin-top: 2px; }
+aside { padding: 14px 18px; background: var(--notice); border-radius: 10px; margin: 24px 0; }
+section { margin-top: 20px; padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+dl { margin: 0; }
+dl > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; margin: 8px 0; }
+dt { color: var(--muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+button { border: 1px solid var(--primary); border-radius: 8px; padding: 10px 18px; background: var(--primary); color: var(--surface); cursor: pointer; font: inherit; font-weight: 600; }
+button.secondary { color: var(--primary); background: transparent; }
+button:disabled { opacity: 0.5; cursor: default; }
+button:focus-visible { outline: 3px solid var(--primary); outline-offset: 4px; }
+#result[data-state="success"] { border-color: var(--success); }
+#result[data-state="success"] h2 { color: var(--success); }
+#result[data-state="error"] { border-color: var(--error); }
+#result[data-state="error"] h2 { color: var(--error); }
+.footnote { font-size: 0.9rem; margin-top: 24px; }
+[hidden] { display: none !important; }
+@media (max-width: 420px) {
+  main { padding: 20px 16px; }
+  section { padding: 18px; }
+  dl > div { grid-template-columns: 1fr; gap: 0; }
+}

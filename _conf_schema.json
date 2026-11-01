@@ -5,8 +5,64 @@
     "default": "onnx",
     "options": [
       "onnx",
-      "jev"
-    ]
+      "jev",
+      "cloudflare"
+    ],
+    "hint": "onnx：本地模型；jev：TypeSafe / OpenRouter；cloudflare：Cloudflare Workers AI（云端模型服务）。"
+  },
+  "cloudflare_api_key": {
+    "type": "string",
+    "description": "Cloudflare 接口密钥",
+    "default": "",
+    "secret": true,
+    "hint": "填写具有当前账户 Workers AI 权限的 API Token（接口令牌）；保存并重载后，可在插件连接测试页面测试。"
+  },
+  "cloudflare_base_url": {
+    "type": "string",
+    "description": "Cloudflare 接口基地址",
+    "default": "",
+    "hint": "填写 https://api.cloudflare.com/client/v4/accounts/你的32位账户ID/ai/run；不包含模型名，仅接受官方 HTTPS 地址。"
+  },
+  "cloudflare_model": {
+    "type": "string",
+    "description": "Cloudflare 决策模型",
+    "default": "@cf/cloudflare/clef-flash",
+    "options": [
+      "@cf/cloudflare/clef-flash",
+      "@cf/cloudflare/clef",
+      "@cf/cloudflare/clef-omni",
+      "自定义"
+    ],
+    "hint": "clef-flash：快速版（默认）；clef：标准版；clef-omni：多模态版。选择“自定义”可填写其他兼容 Clef 决策接口的模型；普通聊天模型不能直接使用。"
+  },
+  "cloudflare_custom_model": {
+    "type": "string",
+    "description": "Cloudflare 自定义决策模型",
+    "default": "",
+    "hint": "仅在决策模型选择“自定义”时使用。填写完整模型ID，例如 @cf/cloudflare/clef-flash；须兼容 Clef 决策接口，保存后请测试连接。"
+  },
+  "cloudflare_timeout_seconds": {
+    "type": "float",
+    "description": "Cloudflare 请求超时（秒）",
+    "default": 10,
+    "hint": "有效范围 (0,120]，无效值使用10秒，超出120秒按120秒处理；运行时失败会直接提交已缓存消息，连接测试则显示失败。"
+  },
+  "cloudflare_enable_images": {
+    "type": "bool",
+    "description": "让图片参与消息完整性判断（可选）",
+    "default": false,
+    "hint": "默认关闭，只判断文字。开启后将最近的图片发送给 Cloudflare，帮助判断消息是否说完；不控制最终回复模型能否看图，回复模型仍收到原有图片。"
+  },
+  "cloudflare_max_images": {
+    "type": "int",
+    "description": "Cloudflare 单次最多判断图片数",
+    "default": 4,
+    "hint": "范围1–4，超出时判断最近的图片；回复模型仍保留全部图片。",
+    "slider": {
+      "min": 1,
+      "max": 4,
+      "step": 1
+    }
   },
   "jev_api_key": {
     "type": "string",

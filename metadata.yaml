@@ -1,5 +1,5 @@
 name: astrbot_plugin_debounce
-desc: "支持 ONNX / JEV 判断的消息防抖插件，合并连续图文消息，减少重复 LLM 调用"
+desc: "支持 ONNX / JEV / Cloudflare 判断的消息防抖插件，合并连续图文消息，提供远程连接测试"
 short_desc: "智能判断消息完整性，保留图片并合并连续消息"
 author: Jason.Joestar
 version: 1.2.1
