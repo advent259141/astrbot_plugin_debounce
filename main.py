@@ -697,6 +697,7 @@ class DebouncePlugin(Star):
                 message_str=message_text,
                 group_id=original_event.get_group_id() or "",
                 message_id=original_event.message_obj.message_id,  # 伪造消息时保留真实ID
+                raw_message=original_event.message_obj.raw_message,  # 伪造事件需透传原始消息对象（QQ 官方适配器出站依赖它）
             )
 
             # 标记这个消息需要跳过防抖
@@ -706,7 +707,7 @@ class DebouncePlugin(Star):
             # 伪造事件并提交
             await StarTools.create_event(
                 abm=new_message,
-                platform=original_event.get_platform_name(),
+                platform=original_event.get_platform_id(),
                 is_wake=True,
             )
 

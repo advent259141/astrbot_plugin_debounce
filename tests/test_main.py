@@ -279,3 +279,106 @@ class JevDebounceTests(unittest.IsolatedAsyncioTestCase):
         active = list(self.plugin.monitor_tasks.values())
         await self.plugin.terminate()
         self.assertTrue(all(task.done() for task in active))
+
+
+class _ReplayPlain:
+    type = "Plain"
+
+    def __init__(self, text=""):
+        self.text = text
+
+
+class _ReplayImage:
+    type = "Image"
+
+    def __init__(self, file):
+        self.file = file
+
+
+class ReplayEvent:
+    """Minimal AstrBot event stub consumed by ``_send_fake_event``."""
+
+    def __init__(self, raw_message, platform_id="bot-1"):
+        self.platform_id = platform_id
+        self.session_id = "session-1"
+        self.session = types.SimpleNamespace(session_id="session-1")
+        self.message_obj = types.SimpleNamespace(
+            message=[_ReplayPlain("上一段"), _ReplayImage("base64://pic")],
+            type=types.SimpleNamespace(value="FriendMessage"),
+            sender="sender-1",
+            session_id="session-1",
+            message_id="message-1",
+            raw_message=raw_message,
+            group_id="",
+        )
+
+    def get_self_id(self):
+        return "self-1"
+
+    def get_group_id(self):
+        return ""
+
+    def get_platform_id(self):
+        return self.platform_id
+
+
+class FakeEventReplayTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.plugin = debounce.DebouncePlugin(None, {"timeout_seconds": 0})
+
+    async def asyncTearDown(self):
+        await self.plugin.terminate()
+
+    async def test_replay_preserves_raw_message_and_platform_id(self):
+        raw_message = object()
+        picture = _ReplayImage("base64://pic")
+        event = ReplayEvent(raw_message)
+        captured = {}
+
+        class FakeStarTools:
+            @classmethod
+            async def create_message(cls, **kwargs):
+                captured["create_message"] = kwargs
+                return types.SimpleNamespace(message_id=kwargs["message_id"])
+
+            @classmethod
+            async def create_event(cls, abm=None, platform=None, is_wake=True):
+                captured["create_event"] = {
+                    "abm": abm,
+                    "platform": platform,
+                    "is_wake": is_wake,
+                }
+
+        star_tools = types.ModuleType("astrbot.core.star.star_tools")
+        star_tools.StarTools = FakeStarTools
+        components = types.ModuleType("astrbot.core.message.components")
+        components.Plain = _ReplayPlain
+        modules = {
+            "astrbot.core": types.ModuleType("astrbot.core"),
+            "astrbot.core.star": types.ModuleType("astrbot.core.star"),
+            "astrbot.core.star.star_tools": star_tools,
+            "astrbot.core.message": types.ModuleType("astrbot.core.message"),
+            "astrbot.core.message.components": components,
+        }
+
+        with patch.dict(sys.modules, modules):
+            replayed = await self.plugin._send_fake_event(
+                event, "合并后的文本", images=[picture]
+            )
+
+        self.assertTrue(replayed)
+        # The replay event must keep the original message object: the QQ
+        # official adapter refuses to send when raw_message is None.
+        self.assertIs(captured["create_message"]["raw_message"], raw_message)
+        self.assertEqual(captured["create_message"]["message_id"], "message-1")
+        self.assertEqual(captured["create_message"]["message_str"], "合并后的文本")
+        self.assertEqual(captured["create_message"]["type"], "FriendMessage")
+        self.assertEqual(captured["create_message"]["session_id"], "session-1")
+        self.assertEqual(captured["create_message"]["self_id"], "self-1")
+        replayed_chain = captured["create_message"]["message"]
+        self.assertIsInstance(replayed_chain[0], _ReplayPlain)
+        self.assertEqual(replayed_chain[0].text, "合并后的文本")
+        self.assertIs(replayed_chain[1], picture)
+        # Multiple adapters of the same type share a name; only the id is unique.
+        self.assertEqual(captured["create_event"]["platform"], "bot-1")
+        self.assertTrue(captured["create_event"]["is_wake"])
